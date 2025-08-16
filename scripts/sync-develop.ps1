@@ -11,6 +11,9 @@ Usage examples (run from repo root):
     # Rebase target branch onto latest main everywhere & auto commit dirty submodules
     powershell -File .\scripts\sync-develop.ps1 -TargetBranch develop -Rebase -AutoCommitSubmoduleChanges -AutoCommitMessage "chore: refresh develop across modules"
 
+    # My preferred command
+    powershell -ExecutionPolicy Bypass -File .\scripts\sync-develop.ps1 -AutoCommitSubmoduleChanges -SubmoduleBaseBranch develop -RootBaseBranch develop -TargetBranch main
+
     # Preview only
     powershell -File .\scripts\sync-develop.ps1 -TargetBranch release/1.2 -DryRun -Verbose
 

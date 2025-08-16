@@ -1,0 +1,39 @@
+# Node / PNPM
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+.expo/
+.expo-shared/
+android/
+ios/
+web-build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Env
+.env*
+!.env.example
+
+# Turbo / cache
+.turbo/
+.cache/
+.next/cache/
+
+# VSCode / IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+coverage/
+*.log
+private-docs/

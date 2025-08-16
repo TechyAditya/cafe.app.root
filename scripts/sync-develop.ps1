@@ -1,33 +1,42 @@
 <#
-Synopsis: Bulk create/switch/push develop branches in all git submodules, then push root develop.
+Synopsis: Bulk create/switch/push a target branch (default: develop) in all git submodules, then create/update & push the same target branch in the root repo.
 
 Usage examples (run from repo root):
-  powershell -ExecutionPolicy Bypass -File .\scripts\sync-develop.ps1
-  powershell -File .\scripts\sync-develop.ps1 -SubmoduleBaseBranch main -RootBaseBranch main -Rebase -AutoCommitSubmoduleChanges -AutoCommitMessage "feat: bootstrap develop branches"
-  powershell -File .\scripts\sync-develop.ps1 -DryRun
+    # Use defaults: target branch 'develop' branched from 'main'
+    powershell -ExecutionPolicy Bypass -File .\scripts\sync-develop.ps1
+
+    # Specify a feature branch sourced from main
+    powershell -File .\scripts\sync-develop.ps1 -TargetBranch feature/inventory -SubmoduleBaseBranch main -RootBaseBranch main
+
+    # Rebase target branch onto latest main everywhere & auto commit dirty submodules
+    powershell -File .\scripts\sync-develop.ps1 -TargetBranch develop -Rebase -AutoCommitSubmoduleChanges -AutoCommitMessage "chore: refresh develop across modules"
+
+    # Preview only
+    powershell -File .\scripts\sync-develop.ps1 -TargetBranch release/1.2 -DryRun -Verbose
 
 Params:
-  -SubmoduleBaseBranch: Branch to branch from when creating submodule develop (default: main)
-  -RootBaseBranch: Branch to branch from when creating root develop (default: main)
-  -AutoCommitSubmoduleChanges: If set, stages & commits uncommitted changes inside each submodule before switching branches.
-  -AutoCommitMessage: Commit message used for submodules (and root) when auto committing.
-  -Rebase: If set, rebases develop on top of base branch instead of merging (if develop already exists).
-  -SkipRootPush: If set, does not push the root develop branch (only submodules).
-  -DryRun: Show what would happen without executing mutating git commands.
-  -Verbose: Built-in PowerShell switch for additional logs.
+    -TargetBranch: The branch to create/update/push in submodules & root (default: develop)
+    -SubmoduleBaseBranch: Source branch used when creating the target in submodules (default: main)
+    -RootBaseBranch: Source branch used when creating the target in the root repo (default: main)
+    -AutoCommitSubmoduleChanges: Auto stage/commit uncommitted changes inside each submodule before branch operations.
+    -AutoCommitMessage: Commit message for auto commits (submodules + root if needed).
+    -Rebase: Rebase target branch on top of its base branch (fetching latest) instead of merging.
+    -SkipRootPush: Update submodules only; skip pushing the root target branch.
+    -DryRun: Describe actions without performing mutating git commands.
+    -Verbose: PowerShell built-in for extra logging.
 
 Behavior:
-  1. Ensures submodules are initialized & updated.
-  2. For each submodule: fetch, create develop if missing (from SubmoduleBaseBranch), optionally rebase/merge, push develop.
-  3. Creates root develop if missing (from RootBaseBranch), stages updated submodule SHAs & .gitmodules, commits & pushes.
-  4. Honors -DryRun to preview actions.
+    1. Initialize & sync submodules.
+    2. For each submodule: fetch, create target branch from SubmoduleBaseBranch if missing, else update (rebase/merge), then push.
+    3. Root repo: create/update same target branch from RootBaseBranch if missing, then stage submodule pointer updates & push (unless skipped).
+    4. Supports dry-run preview.
 
 Edge Cases handled:
-  - Missing submodule develop branch
-  - Uncommitted changes (optional auto commit)
-  - Detached HEAD state
-  - Upstream not set
-  - Idempotent re-runs
+    - Target branch absent locally & remotely
+    - Detached HEAD states in submodules
+    - Dirty working trees (optional auto commit or warning)
+    - Missing remote base branch
+    - Idempotent repeated runs
 
 Requires: git available in PATH.
 #>
@@ -36,6 +45,7 @@ Requires: git available in PATH.
 param(
     [string]$SubmoduleBaseBranch = 'main',
     [string]$RootBaseBranch = 'main',
+    [string]$TargetBranch = 'develop',
     [switch]$AutoCommitSubmoduleChanges,
     [string]$AutoCommitMessage = 'chore: sync develop branches',
     [switch]$Rebase,
@@ -95,22 +105,22 @@ function Ensure-BranchExists {
     return 'created'
 }
 
-function Update-Develop {
+function Update-TargetBranch {
     param(
         [string]$BaseBranch,
         [switch]$IsRoot
     )
-    $target = 'develop'
-    $state = Ensure-BranchExists -Branch $target -BaseBranch $BaseBranch -IsRoot:$IsRoot
+    $branch = $TargetBranch
+    $state = Ensure-BranchExists -Branch $branch -BaseBranch $BaseBranch -IsRoot:$IsRoot
     if ($state -eq 'exists') {
         Invoke-Git 'fetch --all --prune' -AllowFail
-        if ($Rebase) { Invoke-Git "checkout $target"; Invoke-Git "fetch origin $BaseBranch" -AllowFail; Invoke-Git "rebase origin/$BaseBranch" }
-        else { Invoke-Git "checkout $target"; Invoke-Git "fetch origin $BaseBranch" -AllowFail; Invoke-Git "merge --no-edit origin/$BaseBranch" -AllowFail }
+        if ($Rebase) { Invoke-Git "checkout $branch"; Invoke-Git "fetch origin $BaseBranch" -AllowFail; Invoke-Git "rebase origin/$BaseBranch" }
+        else { Invoke-Git "checkout $branch"; Invoke-Git "fetch origin $BaseBranch" -AllowFail; Invoke-Git "merge --no-edit origin/$BaseBranch" -AllowFail }
     }
-    else { Write-Host "Created $target from $BaseBranch" }
+    else { Write-Host "Created $branch from $BaseBranch" }
     # set upstream if missing
     $up = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
-    if (-not $up) { Invoke-Git "push -u origin $target" } else { Invoke-Git "push origin $target" -AllowFail }
+    if (-not $up) { Invoke-Git "push -u origin $branch" } else { Invoke-Git "push origin $branch" -AllowFail }
 }
 
 function Commit-IfNeeded {
@@ -129,7 +139,7 @@ function Commit-IfNeeded {
     }
 }
 
-Write-Host "== sync-develop: starting (DryRun=$DryRun, Rebase=$Rebase) =="
+Write-Host "== sync-target: starting (TargetBranch=$TargetBranch, DryRun=$DryRun, Rebase=$Rebase) =="
 
 # 1. Ensure submodules are initialized
 if (-not (Test-Path .git)) { throw 'Run this script from the root of the root repository.' }
@@ -151,7 +161,7 @@ foreach ($path in $submodules) {
         $headRef = git symbolic-ref -q HEAD 2>$null
         if (-not $headRef) { Write-Host 'Detached HEAD detected; staying as-is until checkout.' }
         Commit-IfNeeded -Message $AutoCommitMessage
-        Update-Develop -BaseBranch $SubmoduleBaseBranch
+    Update-TargetBranch -BaseBranch $SubmoduleBaseBranch
     }
     finally { Pop-Location }
 }
@@ -159,7 +169,7 @@ foreach ($path in $submodules) {
 # 2. Root repository develop
 Write-Host '-- Updating root repository develop' -ForegroundColor Cyan
 Commit-IfNeeded -Message $AutoCommitMessage
-Update-Develop -BaseBranch $RootBaseBranch -IsRoot
+Update-TargetBranch -BaseBranch $RootBaseBranch -IsRoot
 
 # 3. Stage & commit submodule pointer updates
 Write-Host '-- Committing submodule pointer updates in root' -ForegroundColor Cyan
@@ -172,9 +182,9 @@ if ($rootStatus) {
 }
 else { Write-Host 'No root changes to commit.' }
 
-if (-not $SkipRootPush) { Invoke-Git 'push origin develop' -AllowFail }
+if (-not $SkipRootPush) { Invoke-Git "push origin $TargetBranch" -AllowFail }
 else { Write-Host 'SkipRootPush set; not pushing root.' }
 
-Write-Host '== sync-develop: complete ==' -ForegroundColor Green
+Write-Host '== sync-target: complete ==' -ForegroundColor Green
 
 if ($DryRun) { Write-Host 'Dry run mode: no changes were pushed.' -ForegroundColor Yellow }

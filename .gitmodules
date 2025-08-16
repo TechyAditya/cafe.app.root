@@ -1,33 +1,34 @@
 ﻿[submodule "apps/api"]
 	path = apps/api
 	url = https://github.com/TechyAditya/cafe.app.api.git
-	branch = main
+	branch = staging
 [submodule "apps/consumer-mobile"]
 	path = apps/consumer-mobile
 	url = https://github.com/TechyAditya/cafe.app.consumer-mobile.git
-	branch = main
+	branch = staging
 [submodule "apps/staff-mobile"]
 	path = apps/staff-mobile
 	url = https://github.com/TechyAditya/cafe.app.staff-mobile.git
-	branch = main
+	branch = staging
 [submodule "apps/web-admin"]
 	path = apps/web-admin
 	url = https://github.com/TechyAditya/cafe.app.web-admin.git
-	branch = main
+	branch = staging
 [submodule "packages/core-sdk"]
 	path = packages/core-sdk
 	url = https://github.com/TechyAditya/cafe.app.core-sdk.git
-	branch = main
+	branch = staging
 [submodule "packages/printers-sdk"]
 	path = packages/printers-sdk
 	url = https://github.com/TechyAditya/cafe.app.printers-sdk.git
-	branch = main
+	branch = staging
 [submodule "packages/tenant-configs"]
 	path = packages/tenant-configs
 	url = https://github.com/TechyAditya/cafe.app.tenant-configs.git
-	branch = main
+	branch = staging
 [submodule "packages/ui-kit"]
 	path = packages/ui-kit
 	url = https://github.com/TechyAditya/cafe.app.ui-kit.git
-	branch = main
+	branch = staging
+
 

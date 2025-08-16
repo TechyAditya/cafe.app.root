@@ -185,6 +185,18 @@ else { Write-Host 'No root changes to commit.' }
 if (-not $SkipRootPush) { Invoke-Git "push origin $TargetBranch" -AllowFail }
 else { Write-Host 'SkipRootPush set; not pushing root.' }
 
+# Ensure root branch tracks origin/TargetBranch
+try {
+    $currentRootBranch = git rev-parse --abbrev-ref HEAD 2>$null
+    if ($currentRootBranch -eq $TargetBranch) {
+        $currentUpstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+        if (-not $currentUpstream -or $currentUpstream -ne "origin/$TargetBranch") {
+            Write-Host "Setting upstream of $TargetBranch to origin/$TargetBranch" -ForegroundColor Yellow
+            Invoke-Git "branch -u origin/$TargetBranch $TargetBranch" -AllowFail
+        }
+    }
+} catch { Write-Warning "Failed to set upstream tracking: $($_.Exception.Message)" }
+
 Write-Host '== sync-target: complete ==' -ForegroundColor Green
 
 if ($DryRun) { Write-Host 'Dry run mode: no changes were pushed.' -ForegroundColor Yellow }

@@ -185,10 +185,17 @@ foreach ($path in $submodules) {
     finally { Pop-Location }
 }
 
-# 2. Root repository develop
-Write-Host '-- Updating root repository develop' -ForegroundColor Cyan
-Commit-IfNeeded -Message $AutoCommitMessage
+# 2. Root repository target branch
+# NOTE: Previously we committed root changes (like .gitmodules edits) BEFORE creating/checking out
+# the target branch. If the target branch did not yet exist, that commit landed on the previously
+# active branch (bug reported by user). We now ensure the target branch exists & is checked out
+# first, then commit any pending changes so they correctly belong to the target branch.
+Write-Host '-- Updating root repository target branch' -ForegroundColor Cyan
 Update-TargetBranch -BaseBranch $RootBaseBranch -IsRoot
+# Defensive: ensure we are on the target branch even if Update-TargetBranch path returned 'created'
+# and some future refactor alters checkout behavior.
+Invoke-Git "checkout $TargetBranch" -AllowFail
+Commit-IfNeeded -Message $AutoCommitMessage
 
 # 3. Stage & commit submodule pointer updates
 Write-Host '-- Committing submodule pointer updates in root' -ForegroundColor Cyan

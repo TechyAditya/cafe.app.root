@@ -50,7 +50,8 @@ param(
     [string]$AutoCommitMessage = 'chore: sync develop branches',
     [switch]$Rebase,
     [switch]$SkipRootPush,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$NoGitmodulesBranchUpdate
 )
 
 function Invoke-Git {
@@ -140,6 +141,21 @@ function Commit-IfNeeded {
 }
 
 Write-Host "== sync-target: starting (TargetBranch=$TargetBranch, DryRun=$DryRun, Rebase=$Rebase) =="
+
+# Optionally update .gitmodules branch mapping to TargetBranch
+if (-not $NoGitmodulesBranchUpdate -and (Test-Path .gitmodules)) {
+    try {
+        $gmContent = Get-Content .gitmodules -Raw -ErrorAction Stop
+        $updated = [regex]::Replace($gmContent, '(?ms)(\[submodule "[^"]+"\]\s+path\s*=\s*[^\n]+\n\s*url\s*=\s*[^\n]+)(?:\n\s*branch\s*=\s*[^\n]+)?', { param($m) "$($m.Groups[1].Value)`n`tbranch = $TargetBranch" })
+        if ($updated -ne $gmContent) {
+            if ($DryRun) { Write-Host "[DRYRUN] Would update .gitmodules branch entries to $TargetBranch" }
+            else {
+                Set-Content .gitmodules $updated -Encoding UTF8
+                Write-Host ".gitmodules branch entries updated to '$TargetBranch'" -ForegroundColor Yellow
+            }
+        } else { Write-Verbose ".gitmodules already aligned to $TargetBranch" }
+    } catch { Write-Warning "Failed updating .gitmodules: $($_.Exception.Message)" }
+}
 
 # 1. Ensure submodules are initialized
 if (-not (Test-Path .git)) { throw 'Run this script from the root of the root repository.' }
